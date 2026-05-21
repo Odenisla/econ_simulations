@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.ctrl-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ctrl-label{font-size:12px;color:#888;min-width:100px}
+.ctrl-val{font-size:12px;font-weight:500;min-width:36px;text-align:right}
+.stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.stat{background:#f5f5f5;border-radius:6px;padding:8px 10px}
+.stat-label{font-size:11px;color:#888;margin-bottom:3px}
+.stat-value{font-size:16px;font-weight:500}
+.tabs{display:flex;gap:0;border-bottom:1.5px solid #ddd;margin-bottom:16px}
+.tab{padding:7px 18px;font-size:12px;font-weight:500;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;border-top:none;border-left:none;border-right:none}
+.tab.active{color:#111;border-bottom:2px solid #111}
+.panel{display:none}
+.panel.active{display:block}
+.shock-box{background:#f5f5f5;border-radius:6px;padding:10px 14px;font-size:12px;color:#888;margin:8px 0 12px}
+.shock-box span{color:#111;font-weight:500}
+.legend{display:flex;gap:14px;margin:6px 0;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#888}
+.leg-line{width:18px;height:2px;flex-shrink:0}
+.leg-dash{width:18px;height:0;border-top:2px dashed;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div style="padding:0.75rem 0">
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('convergence', event)">Convergence</button>
+  <button class="tab" onclick="switchTab('irf', event)">IRF: savings shock</button>
+</div>
+
+<!-- CONVERGENCE PANEL -->
+<div id="panel-convergence" class="panel active">
+<div style="display:grid;grid-template-columns:260px 1fr;gap:1.5rem;align-items:start">
+  <div>
+    <p style="font-size:12px;font-weight:500;margin:0 0 10px">Parameters</p>
+    <div class="ctrl-row"><span class="ctrl-label">Savings rate s</span><input type="range" min="1" max="9" step="1" value="3" id="slS" style="flex:1"><span class="ctrl-val" id="outS">0.30</span></div>
+    <div class="ctrl-row"><span class="ctrl-label">Depreciation δ</span><input type="range" min="1" max="9" step="1" value="5" id="slD" style="flex:1"><span class="ctrl-val" id="outD">0.05</span></div>
+    <div class="ctrl-row"><span class="ctrl-label">Capital share α</span><input type="range" min="2" max="8" step="1" value="3" id="slA" style="flex:1"><span class="ctrl-val" id="outA">0.30</span></div>
+    <div style="border-top:0.5px solid #ddd;margin:12px 0"></div>
+    <p style="font-size:12px;font-weight:500;margin:0 0 10px">Starting point</p>
+    <div class="ctrl-row"><span class="ctrl-label">Initial capital k₀</span><input type="range" min="1" max="99" step="1" value="20" id="slK0" style="flex:1"><span class="ctrl-val" id="outK0">2.0</span></div>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-label">Steady state k*</div><div class="stat-value" id="sKstar">—</div></div>
+      <div class="stat"><div class="stat-label">Steady state y*</div><div class="stat-value" id="sYstar">—</div></div>
+      <div class="stat"><div class="stat-label">Periods to 95%</div><div class="stat-value" id="sT95">—</div></div>
+    </div>
+    <p style="font-size:11px;color:#888;margin:4px 0 0" id="msgBox"></p>
+  </div>
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <p style="font-size:12px;font-weight:500;margin:0">Output &amp; consumption</p>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-line" style="background:#378ADD"></div>y(t)</div>
+        <div class="leg-item"><div class="leg-line" style="background:#9FE1CB"></div>c(t)</div>
+        <div class="leg-item"><div class="leg-dash" style="border-color:#F0997B"></div>SS</div>
+      </div>
+    </div>
+    <div style="position:relative;width:100%;height:220px"><canvas id="outputChart"></canvas></div>
+    <div style="display:flex;gap:14px;margin:12px 0 4px">
+      <div class="leg-item"><div class="leg-line" style="background:#1D9E75"></div>k(t)</div>
+      <div class="leg-item"><div class="leg-dash" style="border-color:#F0997B"></div>k*</div>
+    </div>
+    <div style="position:relative;width:100%;height:170px"><canvas id="capitalChart"></canvas></div>
+  </div>
+</div>
+</div>
+
+<!-- IRF PANEL -->
+<div id="panel-irf" class="panel">
+<div style="display:grid;grid-template-columns:260px 1fr;gap:1.5rem;align-items:start">
+  <div>
+    <p style="font-size:12px;font-weight:500;margin:0 0 10px">Baseline (old SS)</p>
+    <div class="ctrl-row"><span class="ctrl-label">Savings rate s₀</span><input type="range" min="1" max="9" step="1" value="3" id="irfS0" style="flex:1"><span class="ctrl-val" id="outIrfS0">0.30</span></div>
+    <div class="ctrl-row"><span class="ctrl-label">Depreciation δ</span><input type="range" min="1" max="9" step="1" value="5" id="irfD" style="flex:1"><span class="ctrl-val" id="outIrfD">0.05</span></div>
+    <div class="ctrl-row"><span class="ctrl-label">Capital share α</span><input type="range" min="2" max="8" step="1" value="3" id="irfA" style="flex:1"><span class="ctrl-val" id="outIrfA">0.30</span></div>
+    <div style="border-top:0.5px solid #ddd;margin:12px 0"></div>
+    <p style="font-size:12px;font-weight:500;margin:0 0 10px">Shock</p>
+    <div class="ctrl-row"><span class="ctrl-label">New savings s₁</span><input type="range" min="1" max="9" step="1" value="5" id="irfS1" style="flex:1"><span class="ctrl-val" id="outIrfS1">0.50</span></div>
+    <div class="ctrl-row"><span class="ctrl-label">Shock at period</span><input type="range" min="5" max="30" step="1" value="10" id="irfT" style="flex:1"><span class="ctrl-val" id="outIrfT">10</span></div>
+    <div class="shock-box" id="shockBox">—</div>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-label">Old k*</div><div class="stat-value" id="iKold">—</div></div>
+      <div class="stat"><div class="stat-label">New k*</div><div class="stat-value" id="iKnew">—</div></div>
+      <div class="stat"><div class="stat-label">Δy* (% chg)</div><div class="stat-value" id="iDY">—</div></div>
+    </div>
+  </div>
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <p style="font-size:12px;font-weight:500;margin:0">Output response</p>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-line" style="background:#378ADD"></div>y(t)</div>
+        <div class="leg-item"><div class="leg-dash" style="border-color:#aaa"></div>old y*</div>
+        <div class="leg-item"><div class="leg-dash" style="border-color:#F0997B"></div>new y*</div>
+      </div>
+    </div>
+    <div style="position:relative;width:100%;height:200px"><canvas id="irfYChart"></canvas></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 4px">
+      <p style="font-size:12px;font-weight:500;margin:0">Consumption response</p>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-line" style="background:#9FE1CB"></div>c(t)</div>
+        <div class="leg-item"><div class="leg-dash" style="border-color:#aaa"></div>old c*</div>
+        <div class="leg-item"><div class="leg-dash" style="border-color:#F0997B"></div>new c*</div>
+      </div>
+    </div>
+    <div style="position:relative;width:100%;height:200px"><canvas id="irfCChart"></canvas></div>
+  </div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let outputChart=null, capitalChart=null, irfYChart=null, irfCChart=null;
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchTab(name, event) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'irf') updateIRF();
+}
+
+// ── Core model equations ───────────────────────────────────────────────────────
+
+// Steady state capital: from s·k^α = δ·k  →  k* = (s/δ)^(1/(1-α))
+function steadyState(s, delta, alpha) {
+  return Math.pow(s / delta, 1 / (1 - alpha));
+}
+
+// Law of motion: k_{t+1} = k_t + s·k_t^α - δ·k_t
+// Output:        y_t = k_t^α
+// Consumption:   c_t = (1-s)·y_t
+function simulate(k0, s, delta, alpha, T) {
+  const ks=[k0], ys=[Math.pow(k0,alpha)], cs=[(1-s)*Math.pow(k0,alpha)];
+  let k = k0;
+  for (let t=1; t<T; t++) {
+    k = k + s*Math.pow(k,alpha) - delta*k;
+    if (k < 0.001) k = 0.001;  // floor to avoid numerical issues
+    const y = Math.pow(k, alpha);
+    ks.push(k);
+    ys.push(y);
+    cs.push((1-s)*y);
+  }
+  return { ks, ys, cs };
+}
+
+// How many periods to close 95% of the gap between k0 and k*
+function periodsTo95(k0, kstar, s, delta, alpha) {
+  let k = k0;
+  const target = k0 + 0.95*(kstar - k0);
+  const above = k0 > kstar;
+  for (let t=1; t<2000; t++) {
+    k = k + s*Math.pow(k,alpha) - delta*k;
+    if (!above && k >= target) return t;
+    if (above  && k <= target) return t;
+  }
+  return '>2000';
+}
+
+// ── Convergence tab ────────────────────────────────────────────────────────────
+function updateConvergence() {
+  const s     = +document.getElementById('slS').value  * 0.1;
+  const delta = +document.getElementById('slD').value  * 0.01;
+  const alpha = +document.getElementById('slA').value  * 0.1;
+  const k0    = +document.getElementById('slK0').value * 0.1;
+
+  document.getElementById('outS').textContent  = s.toFixed(2);
+  document.getElementById('outD').textContent  = delta.toFixed(2);
+  document.getElementById('outA').textContent  = alpha.toFixed(2);
+  document.getElementById('outK0').textContent = k0.toFixed(1);
+
+  const kstar = steadyState(s, delta, alpha);
+  const ystar = Math.pow(kstar, alpha);
+  const cstar = (1-s)*ystar;
+
+  document.getElementById('sKstar').textContent = kstar.toFixed(2);
+  document.getElementById('sYstar').textContent = ystar.toFixed(2);
+  document.getElementById('sT95').textContent   = periodsTo95(k0, kstar, s, delta, alpha);
+
+  const T = 150;
+  const { ks, ys, cs } = simulate(k0, s, delta, alpha, T);
+  const labels    = Array.from({length:T}, (_,i) => i);
+  const ystarLine = new Array(T).fill(+ystar.toFixed(4));
+  const cstarLine = new Array(T).fill(+cstar.toFixed(4));
+  const kstarLine = new Array(T).fill(+kstar.toFixed(4));
+
+  document.getElementById('msgBox').textContent =
+    k0 < kstar*0.98 ? 'Below steady state — capital accumulates until s·f(k) = δk.' :
+    k0 > kstar*1.02 ? 'Above steady state — excess capital depreciates faster than it accumulates.' :
+    'Starting near steady state.';
+
+  const chartOpts = (yLabel) => ({
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ grid:{display:false}, ticks:{color:'#888',font:{size:11},maxTicksLimit:8},
+          title:{display:true,text:'period',color:'#888',font:{size:11}} },
+      y:{ ticks:{color:'#888',font:{size:11}}, grid:{color:'rgba(136,135,128,0.12)'},
+          title:{display:true,text:yLabel,color:'#888',font:{size:11}} }
+    },
+    animation:{ duration:300 }
+  });
+
+  if (!outputChart) {
+    outputChart = new Chart(document.getElementById('outputChart'), { type:'line',
+      data:{ labels, datasets:[
+        { label:'y(t)', data:ys, borderColor:'#378ADD', backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0.3 },
+        { label:'c(t)', data:cs, borderColor:'#9FE1CB', backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0.3 },
+        { label:'y*',   data:ystarLine, borderColor:'#F0997B', backgroundColor:'transparent', borderWidth:1.5, borderDash:[5,4], pointRadius:0 },
+        { label:'c*',   data:cstarLine, borderColor:'#F0997B', backgroundColor:'transparent', borderWidth:1.5, borderDash:[5,4], pointRadius:0 }
+      ]}, options:chartOpts('output / consumption') });
+  } else {
+    outputChart.data.datasets[0].data = ys;
+    outputChart.data.datasets[1].data = cs;
+    outputChart.data.datasets[2].data = ystarLine;
+    outputChart.data.datasets[3].data = cstarLine;
+    outputChart.update('active');
+  }
+
+  if (!capitalChart) {
+    capitalChart = new Chart(document.getElementById('capitalChart'), { type:'line',
+      data:{ labels, datasets:[
+        { label:'k(t)', data:ks, borderColor:'#1D9E75', backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0.3 },
+        { label:'k*',   data:kstarLine, borderColor:'#F0997B', backgroundColor:'transparent', borderWidth:1.5, borderDash:[5,4], pointRadius:0 }
+      ]}, options:chartOpts('capital k') });
+  } else {
+    capitalChart.data.datasets[0].data = ks;
+    capitalChart.data.datasets[1].data = kstarLine;
+    capitalChart.update('active');
+  }
+}
+
+// ── IRF tab ────────────────────────────────────────────────────────────────────
+function updateIRF() {
+  const s0     = +document.getElementById('irfS0').value * 0.1;
+  const s1     = +document.getElementById('irfS1').value * 0.1;
+  const delta  = +document.getElementById('irfD').value  * 0.01;
+  const alpha  = +document.getElementById('irfA').value  * 0.1;
+  const tShock = +document.getElementById('irfT').value;
+
+  document.getElementById('outIrfS0').textContent = s0.toFixed(2);
+  document.getElementById('outIrfS1').textContent = s1.toFixed(2);
+  document.getElementById('outIrfD').textContent  = delta.toFixed(2);
+  document.getElementById('outIrfA').textContent  = alpha.toFixed(2);
+  document.getElementById('outIrfT').textContent  = tShock;
+
+  // Compute old and new steady states
+  const kOld = steadyState(s0, delta, alpha);
+  const kNew = steadyState(s1, delta, alpha);
+  const yOld = Math.pow(kOld, alpha);
+  const yNew = Math.pow(kNew, alpha);
+  const cOld = (1-s0)*yOld;
+  const cNew = (1-s1)*yNew;
+  const dyPct = ((yNew-yOld)/yOld*100).toFixed(1);
+
+  document.getElementById('iKold').textContent = kOld.toFixed(2);
+  document.getElementById('iKnew').textContent = kNew.toFixed(2);
+  document.getElementById('iDY').textContent   = (dyPct>0?'+':'')+dyPct+'%';
+  document.getElementById('shockBox').innerHTML =
+    `s changes from <span>${s0.toFixed(2)}</span> to <span>${s1.toFixed(2)}</span> at period <span>${tShock}</span>.
+     New y* is <span>${(dyPct>0?'+':'')+dyPct}%</span> ${s1>s0?'higher':'lower'} than old y*.
+     Consumption <span>${cNew>cOld?'rises':'falls'}</span> at the new SS but note the impact effect.`;
+
+  const T = 80;
+  const labels = Array.from({length:T}, (_,i) => i);
+
+  // Simulate: economy sits at old SS, shock hits at tShock
+  // Before shock: use s0. After shock: use s1.
+  const ys=[], cs=[];
+  let k = kOld;  // start at old steady state
+  for (let t=0; t<T; t++) {
+    const s = (t < tShock) ? s0 : s1;
+    const y = Math.pow(k, alpha);
+    const c = (1-s)*y;
+    ys.push(y);
+    cs.push(c);
+    // Update capital using whichever savings rate applies this period
+    k = k + s*Math.pow(k,alpha) - delta*k;
+    if (k < 0.001) k = 0.001;
+  }
+
+  const yOldLine = new Array(T).fill(+yOld.toFixed(4));
+  const yNewLine = new Array(T).fill(+yNew.toFixed(4));
+  const cOldLine = new Array(T).fill(+cOld.toFixed(4));
+  const cNewLine = new Array(T).fill(+cNew.toFixed(4));
+
+  // Vertical shock line drawn as a Chart.js plugin
+  const shockPlugin = {
+    id: 'shockLine',
+    afterDraw(chart) {
+      const { ctx, chartArea:{ top, bottom }, scales:{ x } } = chart;
+      const xPos = x.getPixelForValue(tShock);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(xPos, top);
+      ctx.lineTo(xPos, bottom);
+      ctx.strokeStyle = 'rgba(136,135,128,0.4)';
+      ctx.setLineDash([4,3]);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#888';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('shock', xPos+3, top+10);
+      ctx.restore();
+    }
+  };
+
+  const irfOpts = (yLabel) => ({
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false}, shockLine:{} },
+    scales:{
+      x:{ grid:{display:false}, ticks:{color:'#888',font:{size:11},maxTicksLimit:8},
+          title:{display:true,text:'period',color:'#888',font:{size:11}} },
+      y:{ ticks:{color:'#888',font:{size:11}}, grid:{color:'rgba(136,135,128,0.12)'},
+          title:{display:true,text:yLabel,color:'#888',font:{size:11}} }
+    },
+    animation:{ duration:300 }
+  });
+
+  if (!irfYChart) {
+    irfYChart = new Chart(document.getElementById('irfYChart'), { type:'line',
+      data:{ labels, datasets:[
+        { label:'y(t)',   data:ys,       borderColor:'#378ADD', backgroundColor:'transparent', borderWidth:2,   pointRadius:0 },
+        { label:'old y*', data:yOldLine, borderColor:'#aaa',    backgroundColor:'transparent', borderWidth:1.5, borderDash:[5,4], pointRadius:0 },
+        { label:'new y*', data:yNewLine, borderColor:'#F0997B', backgroundColor:'transparent', borderWidth:1.5, borderDash:[5,4], pointRadius:0 }
+      ]}, options:irfOpts('output y'), plugins:[shockPlugin] });
+  } else {
+    irfYChart.data.datasets[0].data = ys;
+    irfYChart.data.datasets[1].data = yOldLine;
+    irfYChart.data.datasets[2].data = yNewLine;
+    irfYChart.update('active');
+  }
+
+  if (!irfCChart) {
+    irfCChart = new Chart(document.getElementById('irfCChart'), { type:'line',
+      data:{ labels, datasets:[
+        { label:'c(t)',   data:cs,       borderColor:'#9FE1CB', backgroundColor:'transparent', borderWidth:2,   pointRadius:0 },
+        { label:'old c*', data:cOldLine, borderColor:'#aaa',    backgroundColor:'transparent', borderWidth:1.5, borderDash:[5,4], pointRadius:0 },
+        { label:'new c*', data:cNewLine, borderColor:'#F0997B', backgroundColor:'transparent', borderWidth:1.5, borderDash:[5,4], pointRadius:0 }
+      ]}, options:irfOpts('consumption c'), plugins:[shockPlugin] });
+  } else {
+    irfCChart.data.datasets[0].data = cs;
+    irfCChart.data.datasets[1].data = cOldLine;
+    irfCChart.data.datasets[2].data = cNewLine;
+    irfCChart.update('active');
+  }
+}
+
+// ── Event listeners ────────────────────────────────────────────────────────────
+['slS','slD','slA','slK0'].forEach(id =>
+  document.getElementById(id).addEventListener('input', updateConvergence));
+['irfS0','irfS1','irfD','irfA','irfT'].forEach(id =>
+  document.getElementById(id).addEventListener('input', updateIRF));
+
+// ── Initialise ─────────────────────────────────────────────────────────────────
+updateConvergence();
+</script>
+</div>
+</body>
+</html>
