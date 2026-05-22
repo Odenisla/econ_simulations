@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hopenhayn (1992) — Firm Dynamics Simulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f5f0; --surface: #ffffff; --border: #e2ddd6;
+    --text: #1a1816; --muted: #7a746c;
+    --accent: #2a4a7f; --accent-light: #dce6f5;
+    --exit: #8c2a2a; --enter: #1a5c3a;
+    --cutoff: #c0392b; --orange: #E07B39;
+    --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
+  }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem 4rem; }
+  .page { max-width: 860px; margin: 0 auto; }
+
+  header { margin-bottom: 2.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; }
+  header .tag { display: inline-block; font-family: var(--mono); font-size: .7rem; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 3px; margin-bottom: .75rem; letter-spacing: .04em; }
+  header h1 { font-size: 1.5rem; font-weight: 500; letter-spacing: -0.02em; margin-bottom: .25rem; }
+  header p  { font-size: .875rem; color: var(--muted); line-height: 1.6; max-width: 640px; }
+
+  .tabs { display: flex; border-bottom: 1.5px solid var(--border); margin-bottom: 1.75rem; }
+  .tab  { font-family: var(--mono); font-size: .75rem; letter-spacing: .03em; padding: 8px 18px; cursor: pointer; border: none; background: none; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1.5px; transition: color .15s; }
+  .tab.active { color: var(--text); border-bottom-color: var(--text); }
+  .tab-panel { display: none; } .tab-panel.active { display: block; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .75rem 1rem; }
+  .stat-label { font-family: var(--mono); font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+  .stat-val   { font-family: var(--mono); font-size: 1.35rem; font-weight: 500; }
+
+  .panel-label { font-family: var(--mono); font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
+  .panel-label::before { content: ''; width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+  .panel-label.blue::before  { background: var(--accent); }
+  .panel-label.red::before   { background: var(--exit); }
+  .panel-label.green::before { background: var(--enter); }
+  .panel-label.gray::before  { background: #999; }
+
+  .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1rem .75rem; margin-bottom: 12px; }
+  .sub-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+
+  .leg { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .leg-item { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+  .leg-sq   { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .leg-dash { width: 16px; height: 0; border-top: 2px dashed var(--cutoff); flex-shrink: 0; }
+
+  .logbox { font-family: var(--mono); font-size: .73rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .75rem 1rem; min-height: 3rem; line-height: 1.7; margin-bottom: 1.25rem; }
+
+  .ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button { font-family: var(--mono); font-size: .72rem; letter-spacing: .03em; padding: 7px 15px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; transition: background .15s; }
+  button:hover { background: var(--bg); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1e3a6a; }
+  .speed-wrap { display: flex; align-items: center; gap: 7px; margin-left: 4px; }
+  .speed-wrap label { font-family: var(--mono); font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  input[type=range] { accent-color: var(--accent); width: 85px; cursor: pointer; }
+
+  /* Compare tab */
+  .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.5rem; }
+  .scenario-card { border: 1px solid var(--border); border-radius: 7px; padding: .75rem 1rem; cursor: pointer; transition: border-color .15s, background .15s; background: var(--surface); }
+  .scenario-card:hover  { border-color: #aaa; }
+  .scenario-card.sel-a  { border-color: var(--accent); }
+  .scenario-card.sel-b  { border-color: var(--orange); }
+  .scenario-card.sel-ab { border-color: #999; }
+  .scenario-card h3   { font-size: .8rem; font-weight: 500; margin-bottom: 3px; }
+  .scenario-card .meta{ font-family: var(--mono); font-size: .68rem; color: var(--muted); line-height: 1.7; }
+  .sc-badges { display: flex; gap: 5px; margin-top: 6px; }
+  .badge { font-family: var(--mono); font-size: .62rem; padding: 1px 7px; border-radius: 3px; display: none; }
+  .badge.a { background: var(--accent-light); color: var(--accent); display: inline-block; }
+  .badge.b { background: #fdebd8; color: var(--orange); display: inline-block; }
+
+  .compare-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .cleg { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+  .cleg-line { width: 20px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+  .compare-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1.5rem; }
+  .cstat { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .6rem .75rem; }
+  .cstat-label { font-family: var(--mono); font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+  .cstat-val   { font-family: var(--mono); font-size: 1rem; font-weight: 500; }
+
+  .note { font-size: .78rem; color: var(--muted); line-height: 1.75; margin-top: .75rem; padding: .75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+  .note strong { color: var(--text); }
+
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-family: var(--mono); font-size: .68rem; color: var(--muted); line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="tag">Firm Dynamics — Stationary Equilibrium</div>
+    <h1>Hopenhayn (1992)</h1>
+    <p>Each period, firms with productivity below the exit cutoff z* leave the market. New entrants replace them, drawing from the entry distribution ν. The overall distribution remains unchanged — this is what it means for the equilibrium to be stationary.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(event,'sim')">Stationary distribution</button>
+    <button class="tab" onclick="switchTab(event,'compare')">Comparative statics</button>
+  </div>
+
+  <!-- ========== TAB 1: SIMULATION ========== -->
+  <div class="tab-panel active" id="tab-sim">
+
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Period</div><div class="stat-val" id="s-period">0</div></div>
+      <div class="stat"><div class="stat-label">Exit rate</div><div class="stat-val" id="s-exit" style="color:var(--exit)">—</div></div>
+      <div class="stat"><div class="stat-label">Entry rate</div><div class="stat-val" id="s-enter" style="color:var(--enter)">—</div></div>
+    </div>
+
+    <div class="leg">
+      <div class="leg-item"><div class="leg-sq" style="background:var(--accent)"></div>Active firms</div>
+      <div class="leg-item"><div class="leg-sq" style="background:rgba(140,42,42,0.7)"></div>Exits</div>
+      <div class="leg-item"><div class="leg-sq" style="background:rgba(26,92,58,0.6)"></div>Entrants</div>
+      <div class="leg-item"><div class="leg-dash"></div>Exit cutoff z*</div>
+    </div>
+
+    <div class="chart-box">
+      <div class="panel-label blue">Active firm distribution</div>
+      <div style="position:relative;width:100%;height:210px"><canvas id="dc-main"></canvas></div>
+    </div>
+
+    <div class="sub-grid">
+      <div class="chart-box">
+        <div class="panel-label red">Exits (below z*)</div>
+        <div style="position:relative;width:100%;height:145px"><canvas id="dc-exit"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="panel-label green">Entrants (drawn from ν)</div>
+        <div style="position:relative;width:100%;height:145px"><canvas id="dc-enter"></canvas></div>
+      </div>
+    </div>
+
+    <div class="logbox" id="logbox">Press <strong>Play</strong> to start the simulation.</div>
+
+    <div class="ctrl">
+      <button class="primary" id="btn-play">▶ Play</button>
+      <button id="btn-pause">⏸ Pause</button>
+      <button id="btn-reset">↺ Reset</button>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <input type="range" id="spd" min="1" max="5" value="3" step="1">
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========== TAB 2: COMPARE ========== -->
+  <div class="tab-panel" id="tab-compare">
+
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:1.25rem;line-height:1.7">Select any two scenarios to overlay their stationary distributions. Click a card to assign it to slot <strong style="color:var(--accent)">A</strong> (first click) or <strong style="color:var(--orange)">B</strong> (second click).</p>
+
+    <div class="scenario-grid" id="scenario-grid">
+      <div class="scenario-card sel-a" data-key="baseline">
+        <h3>Baseline</h3>
+        <div class="meta">c_f = 20 · c_e = 40<br>z* = 4.51 · exit rate = 14.9%</div>
+        <div class="sc-badges"><span class="badge a" id="ba-baseline">A</span><span class="badge b" id="bb-baseline"></span></div>
+      </div>
+      <div class="scenario-card sel-b" data-key="cf_low_ce_low">
+        <h3>Low fixed cost, low entry cost</h3>
+        <div class="meta">c_f = 10 · c_e = 20<br>z* = 2.96 · exit rate = 3.8%</div>
+        <div class="sc-badges"><span class="badge a" id="ba-cf_low_ce_low"></span><span class="badge b" id="bb-cf_low_ce_low">B</span></div>
+      </div>
+      <div class="scenario-card" data-key="cf_low_ce_high">
+        <h3>Low fixed cost, high entry cost</h3>
+        <div class="meta">c_f = 10 · c_e = 80<br>z* = 2.96 · exit rate = 3.8%</div>
+        <div class="sc-badges"><span class="badge a" id="ba-cf_low_ce_high"></span><span class="badge b" id="bb-cf_low_ce_high"></span></div>
+      </div>
+      <div class="scenario-card" data-key="cf_high_ce_low">
+        <h3>High fixed cost, low entry cost</h3>
+        <div class="meta">c_f = 40 · c_e = 20<br>z* = 5.56 · exit rate = 28.4%</div>
+        <div class="sc-badges"><span class="badge a" id="ba-cf_high_ce_low"></span><span class="badge b" id="bb-cf_high_ce_low"></span></div>
+      </div>
+      <div class="scenario-card" data-key="cf_high_ce_high">
+        <h3>High fixed cost, high entry cost</h3>
+        <div class="meta">c_f = 40 · c_e = 80<br>z* = 4.51 · exit rate = 14.9%</div>
+        <div class="sc-badges"><span class="badge a" id="ba-cf_high_ce_high"></span><span class="badge b" id="bb-cf_high_ce_high"></span></div>
+      </div>
+    </div>
+
+    <div class="compare-legend">
+      <div class="cleg"><div class="cleg-line" style="background:var(--accent)"></div><span id="leg-a-label">A — Baseline</span></div>
+      <div class="cleg"><div class="cleg-line" style="background:var(--orange)"></div><span id="leg-b-label">B — cf=10, ce=20</span></div>
+    </div>
+
+    <div class="compare-stats">
+      <div class="cstat"><div class="cstat-label" style="color:var(--accent)">A — Exit cutoff</div><div class="cstat-val" id="cs-a-cutoff">4.51</div></div>
+      <div class="cstat"><div class="cstat-label" style="color:var(--accent)">A — Exit rate</div><div class="cstat-val" id="cs-a-exit">14.9%</div></div>
+      <div class="cstat"><div class="cstat-label" style="color:var(--orange)">B — Exit cutoff</div><div class="cstat-val" id="cs-b-cutoff">2.96</div></div>
+      <div class="cstat"><div class="cstat-label" style="color:var(--orange)">B — Exit rate</div><div class="cstat-val" id="cs-b-exit">3.8%</div></div>
+    </div>
+
+    <div class="chart-box">
+      <div class="panel-label blue">Active firm distribution — overlay</div>
+      <div style="position:relative;width:100%;height:240px"><canvas id="dc-compare"></canvas></div>
+    </div>
+
+    <div class="chart-box" style="margin-top:10px">
+      <div class="panel-label gray">Entry distribution ν (same across all scenarios)</div>
+      <div style="position:relative;width:100%;height:120px"><canvas id="dc-nu"></canvas></div>
+    </div>
+
+    <div class="note">
+      <strong>Key insight:</strong> The exit cutoff z* is determined by the fixed cost c_f — not the entry cost c_e. Changing c_e alone shifts the equilibrium price and the mass of entrants, but leaves z* unchanged. The entry distribution ν is the stationary distribution of the productivity process and is identical across all scenarios.
+    </div>
+
+  </div>
+
+  <footer>
+    Calibration: β=0.8, θ=2/3, w=1, D=100. Fixed cost c_f, entry cost c_e, ρ_z=0.9, σ_z=0.2. Rouwenhorst discretisation (N=20 nodes).<br>
+    Hopenhayn, H. (1992). Entry, Exit, and Firm Dynamics in Long Run Equilibrium. <em>Econometrica</em>, 60(5), 1127–1150.
+  </footer>
+
+</div>
+<script>
+(function(){
+  const NZ=20, EXIT_IDX_BASE=10, EXIT_CUTOFF_BASE=4.505339;
+  const gridZ=[0.548812,0.677413,0.83615,1.032083,1.273928,1.572445,1.940912,2.395721,2.957104,3.650035,4.505339,5.561064,6.864175,8.47264,10.458012,12.908613,15.933456,19.667104,24.275647,29.9641];
+  const nu=[1.91e-6,3.624e-5,3.2616e-4,1.84822e-3,7.39288e-3,2.217865e-2,5.175018e-2,9.610748e-2,1.4416122e-1,1.7619705e-1,1.7619705e-1,1.4416122e-1,9.610748e-2,5.175018e-2,2.217865e-2,7.39288e-3,1.84822e-3,3.2616e-4,3.624e-5,1.91e-6];
+  const pdf=[2.8e-7,5.4e-6,4.861e-5,2.7544e-4,1.1021e-3,3.31376e-3,7.85231e-3,1.592064e-2,3.38085e-2,8.669862e-2,1.9378817e-1,2.3894174e-1,2.015832e-1,1.2672723e-1,6.073423e-2,2.205624e-2,5.90524e-3,1.10272e-3,1.2852e-4,7.05e-6];
+  const pi=[[0.3773536,0.3773536,0.17874644,0.05331034,0.01122323,0.00177209,0.00021762,2.127e-5,1.68e-6,1.1e-7,1e-8,0,0,0,0,0,0,0,0,0],[0.01986072,0.39616902,0.36591031,0.16229381,0.04535926,0.00892917,0.00131359,1.4961e-4,1.349e-5,9.8e-7,6e-8,0,0,0,0,0,0,0,0,0],[0.0010453,0.0406567,0.41328763,0.35270011,0.14611798,0.0381388,0.006991,9.5351e-4,1.0013e-4,8.27e-6,5.4e-7,3e-8,0,0,0,0,0,0,0,0],[5.502e-5,3.18223e-3,0.0622412,0.42857494,0.33783395,0.13034455,0.0316465,5.37558e-3,6.7586e-4,6.5e-5,4.87e-6,2.9e-7,1e-8,0,0,0,0,0,0,0],[2.9e-6,2.2235e-4,6.44638e-3,8.445849e-2,0.44191049,0.32143575,0.11509248,2.587193e-2,4.04947e-3,4.6615e-4,4.072e-5,2.75e-6,1.4e-7,1e-8,0,0,0,0,0,0],[1.5e-7,1.459e-5,5.6086e-4,1.086205e-2,0.10714525,0.45318894,0.30364119,0.10047305,0.020797,2.97943e-3,3.1148e-4,2.447e-5,1.47e-6,7e-8,0,0,0,0,0,0],[1e-8,9.2e-7,4.406e-5,1.13023e-3,1.644178e-2,0.13013194,0.462321,0.28459657,8.658886e-2,1.639651e-2,2.13284e-3,2.0051e-4,1.399e-5,7.3e-7,3e-8,0,0,0,0,0],[0,6e-8,3.24e-6,1.0338e-4,1.99015e-3,2.318609e-2,0.1532443,0.46923428,0.26445733,7.353303e-2,1.26386e-2,1.47821e-3,1.2345e-4,7.54e-6,3.4e-7,1e-8,0,0,0,0],[0,0,2.3e-7,8.66e-6,2.0767e-4,3.19954e-3,3.108318e-2,0.17630489,0.47387388,0.24338676,6.138839e-2,9.48544e-3,9.8547e-4,7.198e-5,3.76e-6,1.4e-7,0,0,0,0],[0,0,2e-8,6.8e-7,1.956e-5,3.7503e-4,4.81576e-3,4.010893e-2,0.19913462,0.47620294,0.22155442,5.022686e-2,6.89378e-3,6.2643e-4,3.921e-5,1.71e-6,5e-8,0,0,0],[0,0,0,5e-8,1.71e-6,3.921e-5,6.2643e-4,6.89378e-3,5.022686e-2,0.22155442,0.47620294,0.19913462,4.010893e-2,4.81576e-3,3.7503e-4,1.956e-5,6.8e-7,2e-8,0,0],[0,0,0,0,1.4e-7,3.76e-6,7.198e-5,9.8547e-4,9.48544e-3,6.138839e-2,0.24338676,0.47387388,0.17630489,3.108318e-2,3.19954e-3,2.0767e-4,8.66e-6,2.3e-7,0,0],[0,0,0,0,1e-8,3.4e-7,7.54e-6,1.2345e-4,1.47821e-3,1.26386e-2,7.353303e-2,0.26445733,0.46923428,0.1532443,2.318609e-2,1.99015e-3,1.0338e-4,3.24e-6,6e-8,0],[0,0,0,0,0,3e-8,7.3e-7,1.399e-5,2.0051e-4,2.13284e-3,1.639651e-2,8.658886e-2,0.28459657,0.462321,0.13013194,1.644178e-2,1.13023e-3,4.406e-5,9.2e-7,1e-8],[0,0,0,0,0,0,7e-8,1.47e-6,2.447e-5,3.1148e-4,2.97943e-3,2.0797e-2,0.10047305,0.30364119,0.45318894,0.10714525,1.086205e-2,5.6086e-4,1.459e-5,1.5e-7],[0,0,0,0,0,0,1e-8,1.4e-7,2.75e-6,4.072e-5,4.6615e-4,4.04947e-3,2.587193e-2,0.11509248,0.32143575,0.44191049,8.445849e-2,6.44638e-3,2.2235e-4,2.9e-6],[0,0,0,0,0,0,0,1e-8,2.9e-7,4.87e-6,6.5e-5,6.7586e-4,5.37558e-3,3.16465e-2,0.13034455,0.33783395,0.42857494,0.0622412,3.18223e-3,5.502e-5],[0,0,0,0,0,0,0,0,3e-8,5.4e-7,8.27e-6,1.0013e-4,9.5351e-4,6.991e-3,3.81388e-2,0.14611798,0.35270011,0.41328763,0.0406567,1.0453e-3],[0,0,0,0,0,0,0,0,0,6e-8,9.8e-7,1.349e-5,1.4961e-4,1.31359e-3,8.92917e-3,4.535926e-2,0.16229381,0.36591031,0.39616902,1.986072e-2],[0,0,0,0,0,0,0,0,0,1e-8,1.1e-7,1.68e-6,2.127e-5,2.1762e-4,1.77209e-3,1.122323e-2,5.331034e-2,0.17874644,0.3773536,0.3773536]];
+
+  const SCENARIOS = {
+    baseline:       {label:'Baseline',       cf:20,ce:40, exit_idx:10,exit_cutoff:4.505339,exit_rate:0.149026, pdf:[2.8e-7,5.4e-6,4.861e-5,2.7544e-4,1.1021e-3,3.31376e-3,7.85231e-3,1.592064e-2,3.38085e-2,8.669862e-2,1.9378817e-1,2.3894174e-1,2.015832e-1,1.2672723e-1,6.073423e-2,2.205624e-2,5.90524e-3,1.10272e-3,1.2852e-4,7.05e-6]},
+    cf_low_ce_low:  {label:'cf=10, ce=20',   cf:10,ce:20, exit_idx:8, exit_cutoff:2.957104,exit_rate:0.038144, pdf:[7e-8,1.38e-6,1.247e-5,7.151e-5,3.0696e-4,1.24681e-3,6.1353e-3,3.036904e-2,1.016919e-1,1.7687755e-1,2.1303449e-1,1.9561958e-1,1.4125256e-1,8.071165e-2,3.623453e-2,1.254183e-2,3.23558e-3,5.865e-4,6.67e-5,3.58e-6]},
+    cf_low_ce_high: {label:'cf=10, ce=80',   cf:10,ce:80, exit_idx:8, exit_cutoff:2.957104,exit_rate:0.038144, pdf:[7e-8,1.38e-6,1.247e-5,7.151e-5,3.0696e-4,1.24681e-3,6.1353e-3,3.036904e-2,1.016919e-1,1.7687755e-1,2.1303449e-1,1.9561958e-1,1.4125256e-1,8.071165e-2,3.623453e-2,1.254183e-2,3.23558e-3,5.865e-4,6.67e-5,3.58e-6]},
+    cf_high_ce_low: {label:'cf=40, ce=20',   cf:40,ce:20, exit_idx:11,exit_cutoff:5.561064,exit_rate:0.283846, pdf:[5.4e-7,1.029e-5,9.258e-5,5.2461e-4,2.09848e-3,6.29623e-3,1.470667e-2,2.752557e-2,4.336172e-2,6.664731e-2,1.2258222e-1,2.1910174e-1,2.237356e-1,1.5504068e-1,7.868243e-2,2.967793e-2,8.16456e-3,1.55627e-3,1.8434e-4,1.024e-5]},
+    cf_high_ce_high:{label:'cf=40, ce=80',   cf:40,ce:80, exit_idx:10,exit_cutoff:4.505339,exit_rate:0.149026, pdf:[2.8e-7,5.4e-6,4.861e-5,2.7544e-4,1.1021e-3,3.31376e-3,7.85231e-3,1.592064e-2,3.38085e-2,8.669862e-2,1.9378817e-1,2.3894174e-1,2.015832e-1,1.2672723e-1,6.073423e-2,2.205624e-2,5.90524e-3,1.10272e-3,1.2852e-4,7.05e-6]},
+  };
+
+  const labels = gridZ.map(z=>z.toFixed(2));
+  const gridC = 'rgba(0,0,0,0.05)', txtC = '#888';
+
+  // ---- TAB 1 ----
+  let cur=[...pdf], period=0, timer=null;
+  const SPEEDS=[1200,900,650,400,200];
+
+  const cutoffPlugin = {id:'cutoff',afterDraw(ch){
+    const {ctx:c,scales:{x,y}}=ch;
+    const xp=x.getPixelForValue(EXIT_IDX_BASE-0.5);
+    c.save();c.setLineDash([5,4]);c.strokeStyle='#c0392b';c.lineWidth=2;
+    c.beginPath();c.moveTo(xp,y.top);c.lineTo(xp,y.bottom);c.stroke();
+    c.setLineDash([]);c.fillStyle='#c0392b';c.font='10px DM Mono,monospace';
+    c.textAlign='left';c.fillText('z* = '+EXIT_CUTOFF_BASE.toFixed(2),xp+4,y.top+13);c.restore();
+  }};
+
+  function barChart(id,color,plugins=[]){
+    return new Chart(document.getElementById(id).getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[{data:new Array(NZ).fill(0),backgroundColor:color,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:250},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.raw*100).toFixed(3)+'%'}}},
+        scales:{x:{ticks:{maxTicksLimit:8,color:txtC,font:{size:10}},grid:{color:gridC}},
+                y:{ticks:{color:txtC,callback:v=>(v*100).toFixed(1)+'%',font:{size:10}},grid:{color:gridC}}}},
+      plugins
+    });
+  }
+
+  const cmain  = barChart('dc-main',  '#2a4a7f',[cutoffPlugin]);
+  const cexit  = barChart('dc-exit',  'rgba(140,42,42,0.72)');
+  const center = barChart('dc-enter', 'rgba(26,92,58,0.6)');
+  cmain.data.datasets[0].data=[...pdf]; cmain.update();
+
+  function simStep(){
+    const exitBars=new Array(NZ).fill(0); let totalExit=0;
+    for(let i=0;i<EXIT_IDX_BASE;i++){exitBars[i]=cur[i];totalExit+=cur[i];}
+    const survived=new Array(NZ).fill(0);
+    for(let i=EXIT_IDX_BASE;i<NZ;i++) for(let j=0;j<NZ;j++) survived[j]+=cur[i]*pi[i][j];
+    const enterBars=nu.map(v=>totalExit*v);
+    const newDist=survived.map((v,j)=>v+enterBars[j]);
+    const sum=newDist.reduce((a,b)=>a+b,0);
+    for(let i=0;i<NZ;i++) newDist[i]/=sum;
+    cur=newDist; period++;
+    cmain.data.datasets[0].data=[...cur];
+    cexit.data.datasets[0].data=exitBars.map(v=>v/sum);
+    center.data.datasets[0].data=enterBars.map(v=>v/sum);
+    cmain.update('active');cexit.update('active');center.update('active');
+    document.getElementById('s-period').textContent=period;
+    document.getElementById('s-exit').textContent=(totalExit*100).toFixed(1)+'%';
+    document.getElementById('s-enter').textContent=(totalExit*100).toFixed(1)+'%';
+    const drift=cur.reduce((s,v,i)=>s+Math.abs(v-pdf[i]),0);
+    document.getElementById('logbox').textContent=
+      'Period '+period+': '+(totalExit*100).toFixed(1)+'% of firms exit (below z*) → replaced by equal mass of new entrants drawn from ν. Deviation from stationary: '+(drift*100).toFixed(3)+'%.';
+  }
+  function getDelay(){return SPEEDS[+document.getElementById('spd').value-1];}
+  document.getElementById('btn-play').onclick=()=>{if(timer)return;timer=setInterval(simStep,getDelay());};
+  document.getElementById('btn-pause').onclick=()=>{clearInterval(timer);timer=null;};
+  document.getElementById('btn-reset').onclick=()=>{
+    clearInterval(timer);timer=null;cur=[...pdf];period=0;
+    cmain.data.datasets[0].data=[...pdf];
+    cexit.data.datasets[0].data=new Array(NZ).fill(0);
+    center.data.datasets[0].data=new Array(NZ).fill(0);
+    cmain.update();cexit.update();center.update();
+    document.getElementById('s-period').textContent='0';
+    document.getElementById('s-exit').textContent='—';
+    document.getElementById('s-enter').textContent='—';
+    document.getElementById('logbox').textContent='Press Play to start the simulation.';
+  };
+  document.getElementById('spd').oninput=()=>{if(timer){clearInterval(timer);timer=setInterval(simStep,getDelay());}};
+
+  // ---- TAB 2 ----
+  let selA='baseline', selB='cf_low_ce_low';
+
+  const cutoffOverlayPlugin={id:'cutoffs2',afterDraw(ch){
+    const {ctx:c,scales:{x,y}}=ch;
+    [[SCENARIOS[selA].exit_idx,'#2a4a7f'],[SCENARIOS[selB].exit_idx,'#E07B39']].forEach(([idx,col])=>{
+      const xp=x.getPixelForValue(idx-0.5);
+      c.save();c.setLineDash([4,4]);c.strokeStyle=col;c.lineWidth=1.5;
+      c.beginPath();c.moveTo(xp,y.top);c.lineTo(xp,y.bottom);c.stroke();
+      c.setLineDash([]);c.restore();
+    });
+  }};
+
+  const ccompare=new Chart(document.getElementById('dc-compare').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'A',data:[],borderColor:'#2a4a7f',backgroundColor:'rgba(42,74,127,0.1)',fill:true,tension:0.3,pointRadius:2,borderWidth:2.5},
+      {label:'B',data:[],borderColor:'#E07B39',backgroundColor:'rgba(224,123,57,0.1)',fill:true,tension:0.3,pointRadius:2,borderWidth:2.5}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.raw*100).toFixed(3)+'%'}}},
+      scales:{x:{ticks:{maxTicksLimit:8,color:txtC,font:{size:10}},grid:{color:gridC},title:{display:true,text:'Productivity z',color:txtC,font:{size:11}}},
+              y:{ticks:{color:txtC,callback:v=>(v*100).toFixed(1)+'%',font:{size:10}},grid:{color:gridC},title:{display:true,text:'Share of firms',color:txtC,font:{size:11}}}}},
+    plugins:[cutoffOverlayPlugin]
+  });
+
+  const cnu=new Chart(document.getElementById('dc-nu').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{data:[...nu],backgroundColor:'rgba(120,110,100,0.4)',borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.raw*100).toFixed(3)+'%'}}},
+      scales:{x:{ticks:{maxTicksLimit:8,color:txtC,font:{size:10}},grid:{color:gridC}},
+              y:{ticks:{color:txtC,callback:v=>(v*100).toFixed(2)+'%',font:{size:10}},grid:{color:gridC}}}}
+  });
+
+  function updateCompare(){
+    const sA=SCENARIOS[selA], sB=SCENARIOS[selB];
+    ccompare.data.datasets[0].data=[...sA.pdf];
+    ccompare.data.datasets[1].data=[...sB.pdf];
+    ccompare.update();
+    document.getElementById('cs-a-cutoff').textContent=sA.exit_cutoff.toFixed(2);
+    document.getElementById('cs-a-exit').textContent=(sA.exit_rate*100).toFixed(1)+'%';
+    document.getElementById('cs-b-cutoff').textContent=sB.exit_cutoff.toFixed(2);
+    document.getElementById('cs-b-exit').textContent=(sB.exit_rate*100).toFixed(1)+'%';
+    document.getElementById('leg-a-label').textContent='A — '+sA.label;
+    document.getElementById('leg-b-label').textContent='B — '+sB.label;
+    // update card styles
+    document.querySelectorAll('.scenario-card').forEach(card=>{
+      const k=card.dataset.key;
+      card.classList.remove('sel-a','sel-b','sel-ab');
+      if(k===selA&&k===selB) card.classList.add('sel-ab');
+      else if(k===selA) card.classList.add('sel-a');
+      else if(k===selB) card.classList.add('sel-b');
+      // badges
+      const ba=document.getElementById('ba-'+k), bb=document.getElementById('bb-'+k);
+      if(ba) ba.style.display=(k===selA)?'inline-block':'none';
+      if(bb) bb.style.display=(k===selB)?'inline-block':'none';
+    });
+  }
+
+  // card click: first free slot, or cycle A→B
+  document.querySelectorAll('.scenario-card').forEach(card=>{
+    card.addEventListener('click',()=>{
+      const k=card.dataset.key;
+      if(selA===k){ selA=selB; selB=k; }
+      else if(selB===k){ /* toggle: make it A */ selB=selA; selA=k; }
+      else { selB=k; }
+      updateCompare();
+    });
+  });
+
+  updateCompare();
+
+  // Tab switching
+  window.switchTab=function(e,id){
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById('tab-'+id).classList.add('active');
+    e.target.classList.add('active');
+    if(id==='compare') ccompare.resize();
+  };
+})();
+</script>
+</body>
+</html>
